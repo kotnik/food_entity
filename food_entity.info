@@ -1,0 +1,6 @@
+name = Food entity
+description = Creates food entity
+core = 7.x
+package = Custom
+dependencies[] = entity
+author = kotnik

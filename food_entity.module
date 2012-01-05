@@ -1,0 +1,221 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function food_entity_menu() {
+  $items['admin/structure/food/manage'] = array(
+    'title' => 'Food E Admin',
+    'description' => 'Manage Food Structure',
+    'page callback' => 'food_admin_page',
+    'access arguments' => array('administer food entities'),
+  );
+
+  $items['food/%food'] = array(
+    'title callback' => 'food_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'food_page_view',
+    'page arguments' => array(1),
+    'access arguments' => array('view food entities'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['food/%food/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['food/%food/edit'] = array(
+    'title' => 'Edit',
+    'load arguments' => array('food'),
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'food_item_edit',
+    'access arguments' => array('edit food entities'),
+    'page arguments' => array(1),
+  );
+
+  $items['food/add'] = array(
+    'title' => 'Add Food',
+    'page callback' => 'food_add',
+    'access arguments' => array('create food entities'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function example_entity_permission() {
+    return array(
+    'administer food entities' =>  array(
+      'title' => t('Administer food entities'),
+      'restrict access' => TRUE,
+    ),
+    'view food entities' => array(
+      'title' => t('View Food Entities'),
+    ),
+    'create food entities' => array(
+      'title' => t('Create Food Entities'),
+    ),
+
+  );
+}
+
+/**
+ * Implements hook_entity_info().
+ */
+function food_entity_entity_info() {
+  $food_info['food'] = array(
+    'label' => t('Food Entity'),
+    'controller class' => 'FoodController',
+    'base table' => 'food',
+    'uri callback' => 'food_uri',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'food_id',
+    ),
+    'static cache' => TRUE,
+    'bundles' => array(
+      'food' => array(
+        'label' => 'food',
+        'admin' => array(
+          'path' => 'admin/structure/food/manage',
+          'access arguments' => array('administer food entities'),
+        ),
+      ),
+    ),
+    'view modes' => array(
+      'full' => array(
+        'label' => t('Full'),
+        'custom settings' =>  FALSE,
+      ),
+    )
+  );
+
+  return $food_info;
+}
+
+function food_page_title($food) {
+  return $food->name;
+}
+
+function food_load($food_id = NULL, $reset = FALSE) {
+  $food_ids = (isset($food_id) ? array($food_id) : array());
+  $food = food_load_multiple($food_ids, array(), $reset);
+  return $food ? reset($food) : FALSE;
+}
+
+function food_load_multiple($food_ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('food', $food_ids, $conditions, $reset);
+}
+
+function food_uri($basic) {
+  return array(
+    'path' => 'food/' . $food->food_id,
+  );
+}
+
+function food_admin_page() {
+  $output = 'Admin page for food entities.<br/>';
+  $output .= '<a href="/food/add">Add food entity</a>';
+
+  return $output;
+}
+
+function food_page_view($food, $view_mode = 'full') {
+  $food->content = array();
+  field_attach_prepare_view('food', array($food->food_id => $food), $view_mode);
+  entity_prepare_view('food', array($food->food_id => $food));
+  $food->content += field_attach_view('food', $food, $view_mode);
+  drupal_set_title($food->name);
+  return $food->content;
+}
+
+function food_item_edit($food){
+  drupal_set_title(t('<em>Edit Food entity</em> @title', array('@title' => $food->name)), PASS_THROUGH);
+  return drupal_get_form('food_add_form', $food);
+}
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function food_field_extra_fields() {
+  $return = array();
+  $return['food']['name'] = array(
+    'form' => array(
+      'name' => array(
+        'label' => t('name'),
+        'description' => t('Food name'),
+      ),
+    ),
+  );
+
+  return $return;
+}
+
+function food_add() {
+  $food = (object) array(
+    'food_id' => '',
+    'type' => 'food',
+    'name' => '',
+  );
+
+  return drupal_get_form('food_add_form', $food);
+}
+
+function food_add_form($form, &$form_state, $food) {
+  $form['name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Name'),
+    '#default_value' => $food->name,
+    '#required' => TRUE,
+  );
+
+  $form['food_id'] = array(
+    '#type' => 'hidden',
+    '#default_value' => $food->food_id,
+  );
+
+  field_attach_form('food', $food, $form, $form_state);
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#weight' => 100,
+  );
+
+  return $form;
+}
+
+function food_add_form_validate($form, &$form_state) {
+  $food_submission = (object) $form_state['values'];
+  field_attach_form_validate('food', $food_submission, $form, $form_state);
+}
+
+function food_add_form_submit($form, &$form_state) {
+  $food_submission = (object) $form_state['values'];
+  field_attach_submit('food', $food_submission, $form, $form_state);
+  $food = food_save($food_submission);
+  $form_state['redirect'] = 'food/' . $food->food_id;
+}
+
+function food_save(&$food) {
+  return entity_get_controller('food')->save($food);
+}
+
+class FoodController extends DrupalDefaultEntityController {
+  public function save($food) {
+    if ($food->food_id) {
+      drupal_write_record('food', $food, array('food_id'));
+      field_attach_update('food', $food);
+    }
+    else {
+      drupal_write_record('food', $food);
+      field_attach_insert('food', $food);
+    }
+    module_invoke_all('entity_insert', $food, 'food');
+    return $food;
+  }
+}

@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * Implements hook_schema()
+ */
+function food_entity_schema() {
+  $schema = array();
+
+  $schema['food'] = array(
+      'fields' => array(
+        'food_id' => array(
+          'type' => 'serial',
+          'unsigned' => TRUE,
+          'not null' => TRUE,
+        ),
+        'name' => array(
+          'description' => 'The name of the dish.',
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => TRUE,
+          'default' => '',
+        ),
+    ),
+    'primary key' => array('food_id'),
+  );
+
+  return $schema;
+}
